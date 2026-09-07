@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>3D Room Tour - Fixed Dual Joystick</title>
+    <title>3D Room Tour - Native Dual Joystick</title>
     <style>
         html, body {
             overflow: hidden;
@@ -56,7 +56,7 @@
 
     <div id="instructions">
         <b>Kontrol:</b><br>
-        • <b>HP:</b> 🟠 Joystick Kiri (Jalan) | 🔵 Joystick Kanan (Nengok Atas/Bawah/Samping)<br>
+        • <b>HP:</b> Joystick Kiri (Jalan) | Joystick Kanan (Nengok Atas/Bawah/Samping)<br>
         • <b>PC:</b> Keyboard WASD + Drag Mouse
     </div>
 
@@ -78,13 +78,12 @@
 
             // Universal Camera
             camera = new BABYLON.UniversalCamera("camera", initialCameraPosition.clone(), scene);
-            camera.speed = 0.2;
+            camera.speed = 0.15;
 
-            // Jika di PC: aktifkan kontrol mouse & keyboard (WASD)
+            // Jika di PC: pasang kontrol keyboard & mouse biasa
             if (!isMobile) {
                 camera.attachControl(canvas, true);
                 camera.angularSensibility = 2000;
-                camera.inputs.addMouse();
                 camera.keysUp.push(87);    // W
                 camera.keysDown.push(83);  // S
                 camera.keysLeft.push(65);  // A
@@ -100,101 +99,25 @@
                 console.log("Model berhasil dimuat!");
             });
 
-            // --- SISTEM DUAL JOYSTICK UNTUK MOBILE ---
+            // --- SISTEM NATIVE DUAL JOYSTICK MOBILE ---
             if (isMobile) {
-                // HAPUS TOTAL SEMUA INPUT NATIVE KAMERA DI MOBILE
-                camera.inputs.clear();
+                // Matikan kontrol sentuh layar bawaan agar tidak ada gesture bentrok
+                camera.detachControl();
 
-                const adt = BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI("UI");
+                // Buat 2 Joystick Native Babylon GUI
+                const leftJoystick = new BABYLON.GUI.VirtualJoystick(true);  // Kiri (Left)
+                const rightJoystick = new BABYLON.GUI.VirtualJoystick(false); // Kanan (Right)
 
-                // 1. JOYSTICK KIRI (GERAK / MOVE) - ORANYE
-                const moveThumbCenter = new BABYLON.GUI.Ellipse();
-                moveThumbCenter.width = "110px";
-                moveThumbCenter.height = "110px";
-                moveThumbCenter.color = "White";
-                moveThumbCenter.thickness = 2;
-                moveThumbCenter.background = "rgba(0,0,0,0.3)";
-                moveThumbCenter.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
-                moveThumbCenter.verticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_BOTTOM;
-                moveThumbCenter.left = "25px";
-                moveThumbCenter.top = "-25px";
-                adt.addControl(moveThumbCenter);
+                // Ubah warna ring joystick agar mudah dibedakan
+                leftJoystick.setContainerSize(100);
+                rightJoystick.setContainerSize(100);
 
-                const moveThumbPuck = new BABYLON.GUI.Ellipse();
-                moveThumbPuck.width = "45px";
-                moveThumbPuck.height = "45px";
-                moveThumbPuck.color = "#E65100";
-                moveThumbPuck.background = "#FF9800";
-                moveThumbCenter.addControl(moveThumbPuck);
+                scene.onBeforeRenderObservable.add(function () {
+                    // 1. JOYSTICK KIRI: GERAK POSISI (Maju/Mundur/Samping)
+                    if (leftJoystick.pressed) {
+                        let moveX = leftJoystick.deltaPosition.x;
+                        let moveY = leftJoystick.deltaPosition.y;
 
-                let isMoveDragging = false;
-                let moveX = 0, moveY = 0;
-
-                moveThumbCenter.onPointerDownObservable.add(() => { isMoveDragging = true; });
-                moveThumbCenter.onPointerUpObservable.add(() => {
-                    isMoveDragging = false;
-                    moveThumbPuck.left = 0; moveThumbPuck.top = 0;
-                    moveX = 0; moveY = 0;
-                });
-                moveThumbCenter.onPointerMoveObservable.add((coords) => {
-                    if (isMoveDragging) {
-                        let x = coords.x - moveThumbCenter.centerX;
-                        let y = coords.y - moveThumbCenter.centerY;
-                        let dist = Math.sqrt(x*x + y*y);
-                        if (dist > 35) { x = (x / dist) * 35; y = (y / dist) * 35; }
-                        moveThumbPuck.left = x + "px";
-                        moveThumbPuck.top = y + "px";
-                        moveX = x / 35;
-                        moveY = -(y / 35);
-                    }
-                });
-
-                // 2. JOYSTICK KANAN (NENGOK / LOOK) - BIRU
-                const lookThumbCenter = new BABYLON.GUI.Ellipse();
-                lookThumbCenter.width = "110px";
-                lookThumbCenter.height = "110px";
-                lookThumbCenter.color = "White";
-                lookThumbCenter.thickness = 2;
-                lookThumbCenter.background = "rgba(0,0,0,0.3)";
-                lookThumbCenter.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_RIGHT;
-                lookThumbCenter.verticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_BOTTOM;
-                lookThumbCenter.left = "-25px";
-                lookThumbCenter.top = "-25px";
-                adt.addControl(lookThumbCenter);
-
-                const lookThumbPuck = new BABYLON.GUI.Ellipse();
-                lookThumbPuck.width = "45px";
-                lookThumbPuck.height = "45px";
-                lookThumbPuck.color = "#0D47A1";
-                lookThumbPuck.background = "#2196F3";
-                lookThumbCenter.addControl(lookThumbPuck);
-
-                let isLookDragging = false;
-                let lookX = 0, lookY = 0;
-
-                lookThumbCenter.onPointerDownObservable.add(() => { isLookDragging = true; });
-                lookThumbCenter.onPointerUpObservable.add(() => {
-                    isLookDragging = false;
-                    lookThumbPuck.left = 0; lookThumbPuck.top = 0;
-                    lookX = 0; lookY = 0;
-                });
-                lookThumbCenter.onPointerMoveObservable.add((coords) => {
-                    if (isLookDragging) {
-                        let x = coords.x - lookThumbCenter.centerX;
-                        let y = coords.y - lookThumbCenter.centerY;
-                        let dist = Math.sqrt(x*x + y*y);
-                        if (dist > 35) { x = (x / dist) * 35; y = (y / dist) * 35; }
-                        lookThumbPuck.left = x + "px";
-                        lookThumbPuck.top = y + "px";
-                        lookX = x / 35;
-                        lookY = y / 35; // Arah Y ditarik atas = nilai positif
-                    }
-                });
-
-                // PERHITUNGAN KHUSUS SETIAP FRAME
-                scene.onBeforeRenderObservable.add(function() {
-                    // Joystick Kiri: Pergerakan Posisi (Maju/Mundur/Samping)
-                    if (isMoveDragging) {
                         let forward = camera.getDirection(BABYLON.Axis.Z);
                         let right = camera.getDirection(BABYLON.Axis.X);
                         forward.y = 0; right.y = 0;
@@ -204,20 +127,21 @@
                         camera.position.addInPlace(moveVector);
                     }
 
-                    // Joystick Kanan: Murni Memutar Pandangan Mata (Nengok Atas/Bawah/Kiri/Kanan)
-                    if (isLookDragging) {
-                        let rotationSpeed = 0.035;
-                        camera.rotation.y += lookX * rotationSpeed; // Rotasi Horisontal (Kiri-Kanan)
-                        
-                        // Rotasi Vertikal: Dikurangi (minus) agar saat joystick ditarik ke atas, kamera mendongak ke atas
-                        camera.rotation.x -= lookY * rotationSpeed; 
+                    // 2. JOYSTICK KANAN: MURNI NENGOK (Atas/Bawah/Kiri/Kanan)
+                    if (rightJoystick.pressed) {
+                        let lookX = rightJoystick.deltaPosition.x;
+                        let lookY = rightJoystick.deltaPosition.y;
 
-                        // Batas Maksimal Nengok Atas/Bawah (~75 Derajat)
+                        let rotationSpeed = 0.04;
+                        camera.rotation.y += lookX * rotationSpeed;  // Kiri - Kanan
+                        camera.rotation.x -= lookY * rotationSpeed;  // Atas - Bawah (Mendongak / Menunduk)
+
+                        // Batas rotasi atas/bawah (~75 derajat)
                         let maxAngle = Math.PI / 2.4;
                         camera.rotation.x = Math.max(-maxAngle, Math.min(maxAngle, camera.rotation.x));
                     }
 
-                    // Kunci Ketinggian Sumbu Y (Tinggi Mata Rata)
+                    // Kunci Ketinggian Mata
                     camera.position.y = fixedFloorHeight;
                 });
             }
