@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>3D Room Tour - Dual Joystick Mobile</title>
+    <title>3D Room Tour - Fixed Dual Joystick</title>
     <style>
         html, body {
             overflow: hidden;
@@ -47,7 +47,7 @@
             z-index: 20;
         }
     </style>
-    <!-- Babylon.js CDN & GUI -->
+    <!-- CDN Babylon.js & GUI -->
     <script src="https://cdn.babylonjs.com/babylon.js"></script>
     <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
     <script src="https://cdn.babylonjs.com/gui/babylon.gui.min.js"></script>
@@ -55,9 +55,9 @@
 <body>
 
     <div id="instructions">
-        <b>Kontrol HP:</b><br>
-        • 🟠 <b>Joystick Kiri:</b> Jalan (Maju/Mundur/Samping)<br>
-        • 🔵 <b>Joystick Kanan:</b> Nengok (Kanan/Kiri/Atas/Bawah)
+        <b>Kontrol:</b><br>
+        • <b>HP:</b> 🟠 Joystick Kiri (Jalan) | 🔵 Joystick Kanan (Nengok Atas/Bawah/Samping)<br>
+        • <b>PC:</b> Keyboard WASD + Drag Mouse
     </div>
 
     <button id="resetBtn">🔄 Reset</button>
@@ -69,24 +69,26 @@
         const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
         let camera;
-        let fixedFloorHeight = 1.6;
-        let initialCameraPosition = new BABYLON.Vector3(0, fixedFloorHeight, 0);
+        const fixedFloorHeight = 1.6;
+        const initialCameraPosition = new BABYLON.Vector3(0, fixedFloorHeight, 0);
 
         const createScene = function () {
             const scene = new BABYLON.Scene(engine);
             scene.clearColor = new BABYLON.Color3(0.1, 0.1, 0.15);
 
-            // Universal Camera
+            // Universal Camera sebagai dasar
             camera = new BABYLON.UniversalCamera("camera", initialCameraPosition.clone(), scene);
-            camera.attachControl(canvas, true);
             camera.speed = 0.2;
-            camera.angularSensibility = 2000;
 
-            // Kontrol Keyboard untuk PC (WASD)
-            camera.keysUp.push(87);    // W
-            camera.keysDown.push(83);  // S
-            camera.keysLeft.push(65);  // A
-            camera.keysRight.push(68); // D
+            // Jika di PC: aktifkan kontrol mouse & keyboard (WASD)
+            if (!isMobile) {
+                camera.attachControl(canvas, true);
+                camera.angularSensibility = 2000;
+                camera.keysUp.push(87);    // W
+                camera.keysDown.push(83);  // S
+                camera.keysLeft.push(65);  // A
+                camera.keysRight.push(68); // D
+            }
 
             // Light Ambient
             const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
@@ -99,11 +101,12 @@
 
             // --- SISTEM DUAL JOYSTICK UNTUK MOBILE ---
             if (isMobile) {
+                // Hapus kontrol sentuh bawaan agar geseran layar tidak bentrok dengan joystick
+                camera.detachControl();
+
                 const adt = BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI("UI");
 
-                // ==========================================
                 // 1. JOYSTICK KIRI (GERAK / MOVE) - ORANYE
-                // ==========================================
                 const moveThumbCenter = new BABYLON.GUI.Ellipse();
                 moveThumbCenter.width = "110px";
                 moveThumbCenter.height = "110px";
@@ -145,9 +148,7 @@
                     }
                 });
 
-                // ==========================================
                 // 2. JOYSTICK KANAN (NENGOK / LOOK) - BIRU
-                // ==========================================
                 const lookThumbCenter = new BABYLON.GUI.Ellipse();
                 lookThumbCenter.width = "110px";
                 lookThumbCenter.height = "110px";
@@ -189,11 +190,9 @@
                     }
                 });
 
-                // ==========================================
-                // UPDATE PERGERAKAN & ROTASI SETIAP FRAME
-                // ==========================================
+                // PERHITUNGAN PERGERAKAN & ROTASI SETIAP FRAME
                 scene.onBeforeRenderObservable.add(function() {
-                    // Update Pergerakan (Joystick Kiri)
+                    // Joystick Kiri: Pergerakan Posisi (Maju, Mundur, Samping)
                     if (isMoveDragging) {
                         let forward = camera.getDirection(BABYLON.Axis.Z);
                         let right = camera.getDirection(BABYLON.Axis.X);
@@ -204,18 +203,18 @@
                         camera.position.addInPlace(moveVector);
                     }
 
-                    // Update Rotasi Pandangan (Joystick Kanan)
+                    // Joystick Kanan: Rotasi Pandangan (Nengok Atas, Bawah, Kiri, Kanan)
                     if (isLookDragging) {
-                        let rotationSpeed = 0.03; // Kecepatan rotasi nengok
+                        let rotationSpeed = 0.035;
                         camera.rotation.y += lookX * rotationSpeed; // Kanan - Kiri
                         camera.rotation.x += lookY * rotationSpeed; // Atas - Bawah
 
-                        // Batasi sudut mendongak/menunduk (Batas ~70 derajat)
-                        let maxAngle = Math.PI / 2.5;
+                        // Batas Maksimal Nengok Atas/Bawah (~75 Derajat)
+                        let maxAngle = Math.PI / 2.4;
                         camera.rotation.x = Math.max(-maxAngle, Math.min(maxAngle, camera.rotation.x));
                     }
 
-                    // Kunci Ketinggian Sumbu Y (Lantai Tetap Rata)
+                    // Kunci Ketinggian Mata (Sumbu Y)
                     camera.position.y = fixedFloorHeight;
                 });
             }
@@ -225,7 +224,7 @@
 
         const scene = createScene();
 
-        // Tombol Reset Posisi
+        // Tombol Reset
         document.getElementById("resetBtn").addEventListener("click", function() {
             camera.position = initialCameraPosition.clone();
             camera.rotation = new BABYLON.Vector3(0, 0, 0);
