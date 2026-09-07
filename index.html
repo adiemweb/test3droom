@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>3D Room Tour - Virtual Joystick</title>
+    <title>3D Room Tour - Dual Joystick Mobile</title>
     <style>
         html, body {
             overflow: hidden;
@@ -30,7 +30,7 @@
             border-radius: 8px;
             pointer-events: none;
             z-index: 10;
-            font-size: 13px;
+            font-size: 12px;
         }
         #resetBtn {
             position: absolute;
@@ -55,9 +55,9 @@
 <body>
 
     <div id="instructions">
-        <b>Kontrol:</b><br>
-        • <b>HP:</b> Gunakan Joystick Kiri (Maju/Mundur/Samping) & Usap Layar Kanan (Lihat Sekeliling)<br>
-        • <b>PC:</b> WASD & Mouse
+        <b>Kontrol HP:</b><br>
+        • 🟠 <b>Joystick Kiri:</b> Jalan (Maju/Mundur/Samping)<br>
+        • 🔵 <b>Joystick Kanan:</b> Nengok (Kanan/Kiri/Atas/Bawah)
     </div>
 
     <button id="resetBtn">🔄 Reset</button>
@@ -76,13 +76,13 @@
             const scene = new BABYLON.Scene(engine);
             scene.clearColor = new BABYLON.Color3(0.1, 0.1, 0.15);
 
-            // Universal Camera sebagai basis
+            // Universal Camera
             camera = new BABYLON.UniversalCamera("camera", initialCameraPosition.clone(), scene);
             camera.attachControl(canvas, true);
             camera.speed = 0.2;
             camera.angularSensibility = 2000;
 
-            // Kontrol Keyboard untuk PC
+            // Kontrol Keyboard untuk PC (WASD)
             camera.keysUp.push(87);    // W
             camera.keysDown.push(83);  // S
             camera.keysLeft.push(65);  // A
@@ -92,84 +92,130 @@
             const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
             light.intensity = 1.2;
 
-            // Muat Model GLB
+            // Load Model GLB
             BABYLON.SceneLoader.Append("./", "1_LOW_RESIZED.glb", scene, function (loadedScene) {
                 console.log("Model berhasil dimuat!");
             });
 
-            // --- TAMPILKAN JOYSTICK DI HP ---
+            // --- SISTEM DUAL JOYSTICK UNTUK MOBILE ---
             if (isMobile) {
                 const adt = BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI("UI");
 
-                // Background Ring Joystick
-                const thumbCenter = new BABYLON.GUI.Ellipse();
-                thumbCenter.width = "120px";
-                thumbCenter.height = "120px";
-                thumbCenter.color = "White";
-                thumbCenter.thickness = 3;
-                thumbCenter.background = "rgba(0,0,0,0.3)";
-                thumbCenter.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
-                thumbCenter.verticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_BOTTOM;
-                thumbCenter.left = "30px";
-                thumbCenter.top = "-30px";
-                adt.addControl(thumbCenter);
+                // ==========================================
+                // 1. JOYSTICK KIRI (GERAK / MOVE) - ORANYE
+                // ==========================================
+                const moveThumbCenter = new BABYLON.GUI.Ellipse();
+                moveThumbCenter.width = "110px";
+                moveThumbCenter.height = "110px";
+                moveThumbCenter.color = "White";
+                moveThumbCenter.thickness = 2;
+                moveThumbCenter.background = "rgba(0,0,0,0.3)";
+                moveThumbCenter.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+                moveThumbCenter.verticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_BOTTOM;
+                moveThumbCenter.left = "25px";
+                moveThumbCenter.top = "-25px";
+                adt.addControl(moveThumbCenter);
 
-                // Knob / Ball Joystick
-                const thumbPuck = new BABYLON.GUI.Ellipse();
-                thumbPuck.width = "50px";
-                thumbPuck.height = "50px";
-                thumbPuck.color = "Orange";
-                thumbPuck.background = "Orange";
-                thumbCenter.addControl(thumbPuck);
+                const moveThumbPuck = new BABYLON.GUI.Ellipse();
+                moveThumbPuck.width = "45px";
+                moveThumbPuck.height = "45px";
+                moveThumbPuck.color = "#E65100";
+                moveThumbPuck.background = "#FF9800";
+                moveThumbCenter.addControl(moveThumbPuck);
 
-                let isDragging = false;
-                let xAddPos = 0;
-                let yAddPos = 0;
+                let isMoveDragging = false;
+                let moveX = 0, moveY = 0;
 
-                thumbCenter.onPointerDownObservable.add(function(coordinates) {
-                    isDragging = true;
+                moveThumbCenter.onPointerDownObservable.add(() => { isMoveDragging = true; });
+                moveThumbCenter.onPointerUpObservable.add(() => {
+                    isMoveDragging = false;
+                    moveThumbPuck.left = 0; moveThumbPuck.top = 0;
+                    moveX = 0; moveY = 0;
                 });
-
-                thumbCenter.onPointerUpObservable.add(function(coordinates) {
-                    isDragging = false;
-                    thumbPuck.left = 0;
-                    thumbPuck.top = 0;
-                    xAddPos = 0;
-                    yAddPos = 0;
-                });
-
-                thumbCenter.onPointerMoveObservable.add(function(coordinates) {
-                    if (isDragging) {
-                        let x = coordinates.x - (thumbCenter.centerX);
-                        let y = coordinates.y - (thumbCenter.centerY);
+                moveThumbCenter.onPointerMoveObservable.add((coords) => {
+                    if (isMoveDragging) {
+                        let x = coords.x - moveThumbCenter.centerX;
+                        let y = coords.y - moveThumbCenter.centerY;
                         let dist = Math.sqrt(x*x + y*y);
-                        if (dist > 40) {
-                            x = (x / dist) * 40;
-                            y = (y / dist) * 40;
-                        }
-                        thumbPuck.left = x + "px";
-                        thumbPuck.top = y + "px";
-
-                        xAddPos = x / 40;
-                        yAddPos = -(y / 40);
+                        if (dist > 35) { x = (x / dist) * 35; y = (y / dist) * 35; }
+                        moveThumbPuck.left = x + "px";
+                        moveThumbPuck.top = y + "px";
+                        moveX = x / 35;
+                        moveY = -(y / 35);
                     }
                 });
 
-                // Terapkan Pergerakan Kamera berdasarkan Joystick
+                // ==========================================
+                // 2. JOYSTICK KANAN (NENGOK / LOOK) - BIRU
+                // ==========================================
+                const lookThumbCenter = new BABYLON.GUI.Ellipse();
+                lookThumbCenter.width = "110px";
+                lookThumbCenter.height = "110px";
+                lookThumbCenter.color = "White";
+                lookThumbCenter.thickness = 2;
+                lookThumbCenter.background = "rgba(0,0,0,0.3)";
+                lookThumbCenter.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_RIGHT;
+                lookThumbCenter.verticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_BOTTOM;
+                lookThumbCenter.left = "-25px";
+                lookThumbCenter.top = "-25px";
+                adt.addControl(lookThumbCenter);
+
+                const lookThumbPuck = new BABYLON.GUI.Ellipse();
+                lookThumbPuck.width = "45px";
+                lookThumbPuck.height = "45px";
+                lookThumbPuck.color = "#0D47A1";
+                lookThumbPuck.background = "#2196F3";
+                lookThumbCenter.addControl(lookThumbPuck);
+
+                let isLookDragging = false;
+                let lookX = 0, lookY = 0;
+
+                lookThumbCenter.onPointerDownObservable.add(() => { isLookDragging = true; });
+                lookThumbCenter.onPointerUpObservable.add(() => {
+                    isLookDragging = false;
+                    lookThumbPuck.left = 0; lookThumbPuck.top = 0;
+                    lookX = 0; lookY = 0;
+                });
+                lookThumbCenter.onPointerMoveObservable.add((coords) => {
+                    if (isLookDragging) {
+                        let x = coords.x - lookThumbCenter.centerX;
+                        let y = coords.y - lookThumbCenter.centerY;
+                        let dist = Math.sqrt(x*x + y*y);
+                        if (dist > 35) { x = (x / dist) * 35; y = (y / dist) * 35; }
+                        lookThumbPuck.left = x + "px";
+                        lookThumbPuck.top = y + "px";
+                        lookX = x / 35;
+                        lookY = y / 35;
+                    }
+                });
+
+                // ==========================================
+                // UPDATE PERGERAKAN & ROTASI SETIAP FRAME
+                // ==========================================
                 scene.onBeforeRenderObservable.add(function() {
-                    if (isDragging) {
+                    // Update Pergerakan (Joystick Kiri)
+                    if (isMoveDragging) {
                         let forward = camera.getDirection(BABYLON.Axis.Z);
                         let right = camera.getDirection(BABYLON.Axis.X);
+                        forward.y = 0; right.y = 0;
+                        forward.normalize(); right.normalize();
 
-                        forward.y = 0;
-                        right.y = 0;
-                        forward.normalize();
-                        right.normalize();
-
-                        let moveVector = forward.scale(yAddPos * camera.speed).add(right.scale(xAddPos * camera.speed));
+                        let moveVector = forward.scale(moveY * camera.speed).add(right.scale(moveX * camera.speed));
                         camera.position.addInPlace(moveVector);
                     }
-                    // Kunci Sumbu Y
+
+                    // Update Rotasi Pandangan (Joystick Kanan)
+                    if (isLookDragging) {
+                        let rotationSpeed = 0.03; // Kecepatan rotasi nengok
+                        camera.rotation.y += lookX * rotationSpeed; // Kanan - Kiri
+                        camera.rotation.x += lookY * rotationSpeed; // Atas - Bawah
+
+                        // Batasi sudut mendongak/menunduk (Batas ~70 derajat)
+                        let maxAngle = Math.PI / 2.5;
+                        camera.rotation.x = Math.max(-maxAngle, Math.min(maxAngle, camera.rotation.x));
+                    }
+
+                    // Kunci Ketinggian Sumbu Y (Lantai Tetap Rata)
                     camera.position.y = fixedFloorHeight;
                 });
             }
@@ -179,8 +225,10 @@
 
         const scene = createScene();
 
+        // Tombol Reset Posisi
         document.getElementById("resetBtn").addEventListener("click", function() {
             camera.position = initialCameraPosition.clone();
+            camera.rotation = new BABYLON.Vector3(0, 0, 0);
         });
 
         engine.runRenderLoop(function () {
