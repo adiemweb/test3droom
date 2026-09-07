@@ -76,7 +76,7 @@
             const scene = new BABYLON.Scene(engine);
             scene.clearColor = new BABYLON.Color3(0.1, 0.1, 0.15);
 
-            // Universal Camera sebagai dasar
+            // Universal Camera
             camera = new BABYLON.UniversalCamera("camera", initialCameraPosition.clone(), scene);
             camera.speed = 0.2;
 
@@ -84,6 +84,7 @@
             if (!isMobile) {
                 camera.attachControl(canvas, true);
                 camera.angularSensibility = 2000;
+                camera.inputs.addMouse();
                 camera.keysUp.push(87);    // W
                 camera.keysDown.push(83);  // S
                 camera.keysLeft.push(65);  // A
@@ -101,8 +102,8 @@
 
             // --- SISTEM DUAL JOYSTICK UNTUK MOBILE ---
             if (isMobile) {
-                // Hapus kontrol sentuh bawaan agar geseran layar tidak bentrok dengan joystick
-                camera.detachControl();
+                // HAPUS TOTAL SEMUA INPUT NATIVE KAMERA DI MOBILE
+                camera.inputs.clear();
 
                 const adt = BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI("UI");
 
@@ -186,13 +187,13 @@
                         lookThumbPuck.left = x + "px";
                         lookThumbPuck.top = y + "px";
                         lookX = x / 35;
-                        lookY = y / 35;
+                        lookY = y / 35; // Arah Y ditarik atas = nilai positif
                     }
                 });
 
-                // PERHITUNGAN PERGERAKAN & ROTASI SETIAP FRAME
+                // PERHITUNGAN KHUSUS SETIAP FRAME
                 scene.onBeforeRenderObservable.add(function() {
-                    // Joystick Kiri: Pergerakan Posisi (Maju, Mundur, Samping)
+                    // Joystick Kiri: Pergerakan Posisi (Maju/Mundur/Samping)
                     if (isMoveDragging) {
                         let forward = camera.getDirection(BABYLON.Axis.Z);
                         let right = camera.getDirection(BABYLON.Axis.X);
@@ -203,18 +204,20 @@
                         camera.position.addInPlace(moveVector);
                     }
 
-                    // Joystick Kanan: Rotasi Pandangan (Nengok Atas, Bawah, Kiri, Kanan)
+                    // Joystick Kanan: Murni Memutar Pandangan Mata (Nengok Atas/Bawah/Kiri/Kanan)
                     if (isLookDragging) {
                         let rotationSpeed = 0.035;
-                        camera.rotation.y += lookX * rotationSpeed; // Kanan - Kiri
-                        camera.rotation.x += lookY * rotationSpeed; // Atas - Bawah
+                        camera.rotation.y += lookX * rotationSpeed; // Rotasi Horisontal (Kiri-Kanan)
+                        
+                        // Rotasi Vertikal: Dikurangi (minus) agar saat joystick ditarik ke atas, kamera mendongak ke atas
+                        camera.rotation.x -= lookY * rotationSpeed; 
 
                         // Batas Maksimal Nengok Atas/Bawah (~75 Derajat)
                         let maxAngle = Math.PI / 2.4;
                         camera.rotation.x = Math.max(-maxAngle, Math.min(maxAngle, camera.rotation.x));
                     }
 
-                    // Kunci Ketinggian Mata (Sumbu Y)
+                    // Kunci Ketinggian Sumbu Y (Tinggi Mata Rata)
                     camera.position.y = fixedFloorHeight;
                 });
             }
@@ -224,7 +227,7 @@
 
         const scene = createScene();
 
-        // Tombol Reset
+        // Tombol Reset Posisi
         document.getElementById("resetBtn").addEventListener("click", function() {
             camera.position = initialCameraPosition.clone();
             camera.rotation = new BABYLON.Vector3(0, 0, 0);
