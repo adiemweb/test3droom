@@ -2,8 +2,8 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>3D Room Tour - Native Dual Joystick</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>3D Room Tour - HTML Dual Joystick</title>
     <style>
         html, body {
             overflow: hidden;
@@ -14,53 +14,105 @@
             background-color: #1a1a24;
             touch-action: none;
             font-family: Arial, sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
         }
         #renderCanvas {
             width: 100%;
             height: 100%;
             touch-action: none;
+            display: block;
         }
         #instructions {
             position: absolute;
-            top: 15px;
-            left: 15px;
+            top: 12px;
+            left: 12px;
             color: #ffffff;
             background: rgba(0, 0, 0, 0.75);
-            padding: 10px 14px;
+            padding: 8px 12px;
             border-radius: 8px;
             pointer-events: none;
             z-index: 10;
-            font-size: 12px;
+            font-size: 11px;
         }
         #resetBtn {
             position: absolute;
-            top: 15px;
-            right: 15px;
+            top: 12px;
+            right: 12px;
             background: rgba(230, 81, 0, 0.85);
             color: #ffffff;
             border: none;
-            padding: 10px 16px;
+            padding: 8px 14px;
             border-radius: 8px;
-            font-size: 14px;
+            font-size: 13px;
             font-weight: bold;
             cursor: pointer;
             z-index: 20;
         }
+
+        /* --- STYLING JOYSTICK HTML (OVERLAY) --- */
+        .joystick-base {
+            position: absolute;
+            bottom: 30px;
+            width: 110px;
+            height: 110px;
+            background: rgba(255, 255, 255, 0.15);
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            border-radius: 50%;
+            touch-action: none;
+            z-index: 100;
+            box-sizing: border-box;
+        }
+        #leftJoystickBase {
+            left: 25px;
+        }
+        #rightJoystickBase {
+            right: 25px;
+        }
+        .joystick-stick {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 46px;
+            height: 46px;
+            margin-top: -23px;
+            margin-left: -23px;
+            border-radius: 50%;
+            touch-action: none;
+            pointer-events: none;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+        }
+        #leftStick {
+            background: #FF9800; /* Oranye */
+            border: 2px solid #E65100;
+        }
+        #rightStick {
+            background: #2196F3; /* Biru */
+            border: 2px solid #0D47A1;
+        }
     </style>
-    <!-- CDN Babylon.js & GUI -->
+    <!-- Babylon.js CDN -->
     <script src="https://cdn.babylonjs.com/babylon.js"></script>
     <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
-    <script src="https://cdn.babylonjs.com/gui/babylon.gui.min.js"></script>
 </head>
 <body>
 
     <div id="instructions">
-        <b>Kontrol:</b><br>
-        • <b>HP:</b> Joystick Kiri (Jalan) | Joystick Kanan (Nengok Atas/Bawah/Samping)<br>
-        • <b>PC:</b> Keyboard WASD + Drag Mouse
+        <b>Kontrol HP:</b><br>
+        • 🟠 <b>Kiri:</b> Jalan (Maju/Mundur/Samping)<br>
+        • 🔵 <b>Kanan:</b> Nengok (Atas/Bawah/Kanan/Kiri)
     </div>
 
     <button id="resetBtn">🔄 Reset</button>
+    
+    <!-- HTML OVERLAY JOYSTICKS -->
+    <div id="leftJoystickBase" class="joystick-base">
+        <div id="leftStick" class="joystick-stick"></div>
+    </div>
+    <div id="rightJoystickBase" class="joystick-base">
+        <div id="rightStick" class="joystick-stick"></div>
+    </div>
+
     <canvas id="renderCanvas"></canvas>
 
     <script>
@@ -72,6 +124,10 @@
         const fixedFloorHeight = 1.6;
         const initialCameraPosition = new BABYLON.Vector3(0, fixedFloorHeight, 0);
 
+        // Variable Data Input Joystick
+        let moveInput = { x: 0, y: 0 };
+        let lookInput = { x: 0, y: 0 };
+
         const createScene = function () {
             const scene = new BABYLON.Scene(engine);
             scene.clearColor = new BABYLON.Color3(0.1, 0.1, 0.15);
@@ -80,7 +136,7 @@
             camera = new BABYLON.UniversalCamera("camera", initialCameraPosition.clone(), scene);
             camera.speed = 0.15;
 
-            // Jika di PC: pasang kontrol keyboard & mouse biasa
+            // Kontrol PC (Keyboard WASD & Mouse)
             if (!isMobile) {
                 camera.attachControl(canvas, true);
                 camera.angularSensibility = 2000;
@@ -88,70 +144,137 @@
                 camera.keysDown.push(83);  // S
                 camera.keysLeft.push(65);  // A
                 camera.keysRight.push(68); // D
+
+                // Sembunyikan Elemen Joystick di PC
+                document.getElementById("leftJoystickBase").style.display = "none";
+                document.getElementById("rightJoystickBase").style.display = "none";
             }
 
-            // Light Ambient
+            // Lampu Ambient
             const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
             light.intensity = 1.2;
 
             // Load Model GLB
-            BABYLON.SceneLoader.Append("./", "1_LOW_RESIZED.glb", scene, function (loadedScene) {
+            BABYLON.SceneLoader.Append("./", "1_LOW_RESIZED.glb", scene, function () {
                 console.log("Model berhasil dimuat!");
             });
 
-            // --- SISTEM NATIVE DUAL JOYSTICK MOBILE ---
+            // Lepas Kontrol Canvas bawaan di HP agar tidak mengganggu touch event HTML
             if (isMobile) {
-                // Matikan kontrol sentuh layar bawaan agar tidak ada gesture bentrok
                 camera.detachControl();
+            }
 
-                // Buat 2 Joystick Native Babylon GUI
-                const leftJoystick = new BABYLON.GUI.VirtualJoystick(true);  // Kiri (Left)
-                const rightJoystick = new BABYLON.GUI.VirtualJoystick(false); // Kanan (Right)
-
-                // Ubah warna ring joystick agar mudah dibedakan
-                leftJoystick.setContainerSize(100);
-                rightJoystick.setContainerSize(100);
-
-                scene.onBeforeRenderObservable.add(function () {
-                    // 1. JOYSTICK KIRI: GERAK POSISI (Maju/Mundur/Samping)
-                    if (leftJoystick.pressed) {
-                        let moveX = leftJoystick.deltaPosition.x;
-                        let moveY = leftJoystick.deltaPosition.y;
-
+            // LOOP RENDER: Eksekusi Pergerakan Kamera Berdasarkan Input HTML Joystick
+            scene.onBeforeRenderObservable.add(function () {
+                if (isMobile) {
+                    // 1. JOYSTICK KIRI: GERAK (Maju, Mundur, Samping)
+                    if (moveInput.x !== 0 || moveInput.y !== 0) {
                         let forward = camera.getDirection(BABYLON.Axis.Z);
                         let right = camera.getDirection(BABYLON.Axis.X);
                         forward.y = 0; right.y = 0;
                         forward.normalize(); right.normalize();
 
-                        let moveVector = forward.scale(moveY * camera.speed).add(right.scale(moveX * camera.speed));
+                        let moveVector = forward.scale(moveInput.y * camera.speed).add(right.scale(moveInput.x * camera.speed));
                         camera.position.addInPlace(moveVector);
                     }
 
-                    // 2. JOYSTICK KANAN: MURNI NENGOK (Atas/Bawah/Kiri/Kanan)
-                    if (rightJoystick.pressed) {
-                        let lookX = rightJoystick.deltaPosition.x;
-                        let lookY = rightJoystick.deltaPosition.y;
+                    // 2. JOYSTICK KANAN: MURNI NENGOK (Atas, Bawah, Kiri, Kanan)
+                    if (lookInput.x !== 0 || lookInput.y !== 0) {
+                        let rotationSpeed = 0.035;
+                        camera.rotation.y += lookInput.x * rotationSpeed;  // Kiri - Kanan
+                        camera.rotation.x -= lookInput.y * rotationSpeed;  // Tarik Atas = Nengok Atas
 
-                        let rotationSpeed = 0.04;
-                        camera.rotation.y += lookX * rotationSpeed;  // Kiri - Kanan
-                        camera.rotation.x -= lookY * rotationSpeed;  // Atas - Bawah (Mendongak / Menunduk)
-
-                        // Batas rotasi atas/bawah (~75 derajat)
+                        // Batas Atas & Bawah (~75 derajat)
                         let maxAngle = Math.PI / 2.4;
                         camera.rotation.x = Math.max(-maxAngle, Math.min(maxAngle, camera.rotation.x));
                     }
 
-                    // Kunci Ketinggian Mata
+                    // Kunci Tinggi Kamera (Lantai Rata)
                     camera.position.y = fixedFloorHeight;
-                });
-            }
+                }
+            });
 
             return scene;
         };
 
         const scene = createScene();
 
-        // Tombol Reset Posisi
+        // ====================================================
+        // FUNGSIONALITAS TOUCH EVENT HTML (NATIVE BROWSER)
+        // ====================================================
+        function setupHTMLJoystick(baseId, stickId, outputObj) {
+            const base = document.getElementById(baseId);
+            const stick = document.getElementById(stickId);
+            const maxRadius = 35; // Jarak geser maksimal piringan
+            let touchId = null;
+
+            base.addEventListener("touchstart", function (e) {
+                if (touchId === null) {
+                    const touch = e.changedTouches[0];
+                    touchId = touch.identifier;
+                    updateStickPosition(touch);
+                }
+            }, { passive: false });
+
+            window.addEventListener("touchmove", function (e) {
+                if (touchId !== null) {
+                    for (let i = 0; i < e.changedTouches.length; i++) {
+                        if (e.changedTouches[i].identifier === touchId) {
+                            updateStickPosition(e.changedTouches[i]);
+                            e.preventDefault();
+                            break;
+                        }
+                    }
+                }
+            }, { passive: false });
+
+            function resetStick() {
+                touchId = null;
+                stick.style.transform = `translate(0px, 0px)`;
+                outputObj.x = 0;
+                outputObj.y = 0;
+            }
+
+            window.addEventListener("touchend", function (e) {
+                if (touchId !== null) {
+                    for (let i = 0; i < e.changedTouches.length; i++) {
+                        if (e.changedTouches[i].identifier === touchId) {
+                            resetStick();
+                            break;
+                        }
+                    }
+                }
+            });
+
+            window.addEventListener("touchcancel", resetStick);
+
+            function updateStickPosition(touch) {
+                const rect = base.getBoundingClientRect();
+                const centerX = rect.left + rect.width / 2;
+                const centerY = rect.top + rect.height / 2;
+
+                let deltaX = touch.clientX - centerX;
+                let deltaY = touch.clientY - centerY;
+                let dist = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+
+                if (dist > maxRadius) {
+                    deltaX = (deltaX / dist) * maxRadius;
+                    deltaY = (deltaY / dist) * maxRadius;
+                }
+
+                stick.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
+                outputObj.x = deltaX / maxRadius;
+                outputObj.y = -(deltaY / maxRadius); // Invert Y agar ke atas bernilai positif
+            }
+        }
+
+        // Jalankan listener joystick jika di HP
+        if (isMobile) {
+            setupHTMLJoystick("leftJoystickBase", "leftStick", moveInput);
+            setupHTMLJoystick("rightJoystickBase", "rightStick", lookInput);
+        }
+
+        // Tombol Reset
         document.getElementById("resetBtn").addEventListener("click", function() {
             camera.position = initialCameraPosition.clone();
             camera.rotation = new BABYLON.Vector3(0, 0, 0);
