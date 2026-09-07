@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>3D Room Tour - HTML Dual Joystick</title>
+    <title>3D Room Tour - Guaranteed Touch Controls</title>
     <style>
         html, body {
             overflow: hidden;
@@ -50,24 +50,24 @@
             z-index: 20;
         }
 
-        /* --- STYLING JOYSTICK HTML (OVERLAY) --- */
+        /* --- STYLING JOYSTICK HTML (SELALU MUNCUL DI ATAS CANVAS) --- */
         .joystick-base {
             position: absolute;
             bottom: 30px;
             width: 110px;
             height: 110px;
-            background: rgba(255, 255, 255, 0.15);
-            border: 2px solid rgba(255, 255, 255, 0.5);
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.6);
             border-radius: 50%;
             touch-action: none;
-            z-index: 100;
+            z-index: 999;
             box-sizing: border-box;
         }
         #leftJoystickBase {
-            left: 25px;
+            left: 20px;
         }
         #rightJoystickBase {
-            right: 25px;
+            right: 20px;
         }
         .joystick-stick {
             position: absolute;
@@ -80,7 +80,7 @@
             border-radius: 50%;
             touch-action: none;
             pointer-events: none;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.5);
         }
         #leftStick {
             background: #FF9800; /* Oranye */
@@ -98,14 +98,14 @@
 <body>
 
     <div id="instructions">
-        <b>Kontrol HP:</b><br>
+        <b>Kontrol:</b><br>
         • 🟠 <b>Kiri:</b> Jalan (Maju/Mundur/Samping)<br>
         • 🔵 <b>Kanan:</b> Nengok (Atas/Bawah/Kanan/Kiri)
     </div>
 
     <button id="resetBtn">🔄 Reset</button>
     
-    <!-- HTML OVERLAY JOYSTICKS -->
+    <!-- ELEMEN JOYSTICK -->
     <div id="leftJoystickBase" class="joystick-base">
         <div id="leftStick" class="joystick-stick"></div>
     </div>
@@ -118,13 +118,12 @@
     <script>
         const canvas = document.getElementById("renderCanvas");
         const engine = new BABYLON.Engine(canvas, true);
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
         let camera;
         const fixedFloorHeight = 1.6;
         const initialCameraPosition = new BABYLON.Vector3(0, fixedFloorHeight, 0);
 
-        // Variable Data Input Joystick
+        // Nilai Input Joystick
         let moveInput = { x: 0, y: 0 };
         let lookInput = { x: 0, y: 0 };
 
@@ -136,21 +135,15 @@
             camera = new BABYLON.UniversalCamera("camera", initialCameraPosition.clone(), scene);
             camera.speed = 0.15;
 
-            // Kontrol PC (Keyboard WASD & Mouse)
-            if (!isMobile) {
-                camera.attachControl(canvas, true);
-                camera.angularSensibility = 2000;
-                camera.keysUp.push(87);    // W
-                camera.keysDown.push(83);  // S
-                camera.keysLeft.push(65);  // A
-                camera.keysRight.push(68); // D
+            // Tambahkan kontrol keyboard WASD untuk PC tanpa mematikan Touch Joystick
+            camera.attachControl(canvas, true);
+            camera.inputs.removeByType("FreeCameraTouchInput"); // Hapus touch bawaan agar tidak bentrok
+            camera.keysUp.push(87);    // W
+            camera.keysDown.push(83);  // S
+            camera.keysLeft.push(65);  // A
+            camera.keysRight.push(68); // D
 
-                // Sembunyikan Elemen Joystick di PC
-                document.getElementById("leftJoystickBase").style.display = "none";
-                document.getElementById("rightJoystickBase").style.display = "none";
-            }
-
-            // Lampu Ambient
+            // Light Ambient
             const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
             light.intensity = 1.2;
 
@@ -159,39 +152,32 @@
                 console.log("Model berhasil dimuat!");
             });
 
-            // Lepas Kontrol Canvas bawaan di HP agar tidak mengganggu touch event HTML
-            if (isMobile) {
-                camera.detachControl();
-            }
-
-            // LOOP RENDER: Eksekusi Pergerakan Kamera Berdasarkan Input HTML Joystick
+            // LOOP RENDER UTAMA
             scene.onBeforeRenderObservable.add(function () {
-                if (isMobile) {
-                    // 1. JOYSTICK KIRI: GERAK (Maju, Mundur, Samping)
-                    if (moveInput.x !== 0 || moveInput.y !== 0) {
-                        let forward = camera.getDirection(BABYLON.Axis.Z);
-                        let right = camera.getDirection(BABYLON.Axis.X);
-                        forward.y = 0; right.y = 0;
-                        forward.normalize(); right.normalize();
+                // 1. JOYSTICK KIRI: GERAK POSISI
+                if (moveInput.x !== 0 || moveInput.y !== 0) {
+                    let forward = camera.getDirection(BABYLON.Axis.Z);
+                    let right = camera.getDirection(BABYLON.Axis.X);
+                    forward.y = 0; right.y = 0;
+                    forward.normalize(); right.normalize();
 
-                        let moveVector = forward.scale(moveInput.y * camera.speed).add(right.scale(moveInput.x * camera.speed));
-                        camera.position.addInPlace(moveVector);
-                    }
-
-                    // 2. JOYSTICK KANAN: MURNI NENGOK (Atas, Bawah, Kiri, Kanan)
-                    if (lookInput.x !== 0 || lookInput.y !== 0) {
-                        let rotationSpeed = 0.035;
-                        camera.rotation.y += lookInput.x * rotationSpeed;  // Kiri - Kanan
-                        camera.rotation.x -= lookInput.y * rotationSpeed;  // Tarik Atas = Nengok Atas
-
-                        // Batas Atas & Bawah (~75 derajat)
-                        let maxAngle = Math.PI / 2.4;
-                        camera.rotation.x = Math.max(-maxAngle, Math.min(maxAngle, camera.rotation.x));
-                    }
-
-                    // Kunci Tinggi Kamera (Lantai Rata)
-                    camera.position.y = fixedFloorHeight;
+                    let moveVector = forward.scale(moveInput.y * camera.speed).add(right.scale(moveInput.x * camera.speed));
+                    camera.position.addInPlace(moveVector);
                 }
+
+                // 2. JOYSTICK KANAN: MURNI NENGOK
+                if (lookInput.x !== 0 || lookInput.y !== 0) {
+                    let rotationSpeed = 0.035;
+                    camera.rotation.y += lookInput.x * rotationSpeed;  // Kiri - Kanan
+                    camera.rotation.x -= lookInput.y * rotationSpeed;  // Tarik Atas = Nengok Atas
+
+                    // Batas Atas & Bawah (~75 derajat)
+                    let maxAngle = Math.PI / 2.4;
+                    camera.rotation.x = Math.max(-maxAngle, Math.min(maxAngle, camera.rotation.x));
+                }
+
+                // Kunci Tinggi Kamera (Lantai Rata)
+                camera.position.y = fixedFloorHeight;
             });
 
             return scene;
@@ -200,15 +186,16 @@
         const scene = createScene();
 
         // ====================================================
-        // FUNGSIONALITAS TOUCH EVENT HTML (NATIVE BROWSER)
+        // MANAJEMEN TOUCH EVENT BROWSER (MURNI & BUKAN VIA USER-AGENT)
         // ====================================================
         function setupHTMLJoystick(baseId, stickId, outputObj) {
             const base = document.getElementById(baseId);
             const stick = document.getElementById(stickId);
-            const maxRadius = 35; // Jarak geser maksimal piringan
+            const maxRadius = 35;
             let touchId = null;
 
             base.addEventListener("touchstart", function (e) {
+                e.preventDefault();
                 if (touchId === null) {
                     const touch = e.changedTouches[0];
                     touchId = touch.identifier;
@@ -264,15 +251,13 @@
 
                 stick.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
                 outputObj.x = deltaX / maxRadius;
-                outputObj.y = -(deltaY / maxRadius); // Invert Y agar ke atas bernilai positif
+                outputObj.y = -(deltaY / maxRadius);
             }
         }
 
-        // Jalankan listener joystick jika di HP
-        if (isMobile) {
-            setupHTMLJoystick("leftJoystickBase", "leftStick", moveInput);
-            setupHTMLJoystick("rightJoystickBase", "rightStick", lookInput);
-        }
+        // Inisialisasi Joystick HTML
+        setupHTMLJoystick("leftJoystickBase", "leftStick", moveInput);
+        setupHTMLJoystick("rightJoystickBase", "rightStick", lookInput);
 
         // Tombol Reset
         document.getElementById("resetBtn").addEventListener("click", function() {
