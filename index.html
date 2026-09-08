@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>3D Room Tour - Smooth Controls & Collision</title>
+    <title>3D Room Tour - Fixed Mobile & PC Controls</title>
     <style>
         html, body {
             overflow: hidden;
@@ -63,12 +63,8 @@
             z-index: 999;
             box-sizing: border-box;
         }
-        #leftJoystickBase {
-            left: 20px;
-        }
-        #rightJoystickBase {
-            right: 20px;
-        }
+        #leftJoystickBase { left: 20px; }
+        #rightJoystickBase { right: 20px; }
         .joystick-stick {
             position: absolute;
             top: 50%;
@@ -82,14 +78,8 @@
             pointer-events: none;
             box-shadow: 0 2px 8px rgba(0,0,0,0.5);
         }
-        #leftStick {
-            background: #FF9800; /* Oranye */
-            border: 2px solid #E65100;
-        }
-        #rightStick {
-            background: #2196F3; /* Biru */
-            border: 2px solid #0D47A1;
-        }
+        #leftStick { background: #FF9800; border: 2px solid #E65100; }
+        #rightStick { background: #2196F3; border: 2px solid #0D47A1; }
     </style>
     <!-- Babylon.js CDN -->
     <script src="https://cdn.babylonjs.com/babylon.js"></script>
@@ -99,13 +89,12 @@
 
     <div id="instructions">
         <b>Kontrol:</b><br>
-        • 🟠 <b>Kiri:</b> Jalan (Maju/Mundur/Samping)<br>
-        • 🔵 <b>Kanan:</b> Nengok (Atas/Bawah/Kanan/Kiri)
+        • 🟠 <b>Kiri / WASD:</b> Jalan<br>
+        • 🔵 <b>Kanan / Mouse:</b> Nengok
     </div>
 
     <button id="resetBtn">🔄 Reset</button>
     
-    <!-- ELEMEN JOYSTICK -->
     <div id="leftJoystickBase" class="joystick-base">
         <div id="leftStick" class="joystick-stick"></div>
     </div>
@@ -123,7 +112,6 @@
         const fixedFloorHeight = 1.6;
         const initialCameraPosition = new BABYLON.Vector3(0, fixedFloorHeight, 0);
 
-        // Data Input Joystick
         let moveInput = { x: 0, y: 0 };
         let lookInput = { x: 0, y: 0 };
 
@@ -131,42 +119,46 @@
             const scene = new BABYLON.Scene(engine);
             scene.clearColor = new BABYLON.Color3(0.1, 0.1, 0.15);
 
-            // 1. AKTIFKAN TABRAKAN PADA SCENE
+            // AKTIFKAN COLLISION SCENE
             scene.collisionsEnabled = true;
 
             // Universal Camera
             camera = new BABYLON.UniversalCamera("camera", initialCameraPosition.clone(), scene);
+            camera.speed = 0.1;
             
-            // 2. AKTIFKAN FISIK & TABRAKAN KAMERA
+            // ATUR UKURAN TABRAKAN KAMERA (Dibuat lebih kecil agar tidak mudah tersangkut di dalam mesh)
             camera.checkCollisions = true;
             camera.applyGravity = false;
-            camera.ellipsoid = new BABYLON.Vector3(0.3, 0.8, 0.3); // Volume fisik kamera
+            camera.ellipsoid = new BABYLON.Vector3(0.2, 0.7, 0.2);
 
-            // Controls PC (Keyboard WASD)
+            // ATUR KONTROL KEYBOARD (WASD) UNTUK LAPTOP
             camera.attachControl(canvas, true);
-            camera.inputs.removeByType("FreeCameraTouchInput");
-            camera.keysUp.push(87);    // W
-            camera.keysDown.push(83);  // S
-            camera.keysLeft.push(65);  // A
-            camera.keysRight.push(68); // D
+            camera.keysUp = [87];    // W
+            camera.keysDown = [83];  // S
+            camera.keysLeft = [65];  // A
+            camera.keysRight = [68]; // D
 
             // Light Ambient
             const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
             light.intensity = 1.2;
 
-            // 3. LOAD MODEL GLB & AKTIFKAN TABRAKAN MESH
+            // LOAD MODEL GLB
             BABYLON.SceneLoader.Append("./", "1_LOW_RESIZED.glb", scene, function (loadedScene) {
                 console.log("Model berhasil dimuat!");
+                
+                // Aktifkan collision hanya pada mesh yang memiliki geometri valid
                 loadedScene.meshes.forEach(function (mesh) {
-                    mesh.checkCollisions = true; // Objek hasil scan jadi padat
+                    if (mesh.getTotalVertices() > 0) {
+                        mesh.checkCollisions = true;
+                    }
                 });
             });
 
             // LOOP RENDER UTAMA
             scene.onBeforeRenderObservable.add(function () {
-                // 1. JOYSTICK KIRI: GERAK POSISI (DIPELANKAN)
+                // 1. KONTROL JOYSTICK KIRI (JALAN)
                 if (moveInput.x !== 0 || moveInput.y !== 0) {
-                    let moveSpeed = 0.05; // Kecepatan jalan dipelankan (sebelumnya 0.15)
+                    let moveSpeed = 0.06;
                     
                     let forward = camera.getDirection(BABYLON.Axis.Z);
                     let right = camera.getDirection(BABYLON.Axis.X);
@@ -175,23 +167,22 @@
 
                     let moveVector = forward.scale(moveInput.y * moveSpeed).add(right.scale(moveInput.x * moveSpeed));
                     
-                    // Gunakan moveWithCollisions agar ditahan jika menabrak dinding
+                    // Eksekusi Pergerakan dengan Collision
                     camera.moveWithCollisions(moveVector);
                 }
 
-                // 2. JOYSTICK KANAN: MURNI NENGOK (DIPELANKAN)
+                // 2. KONTROL JOYSTICK KANAN (NENGOK)
                 if (lookInput.x !== 0 || lookInput.y !== 0) {
-                    let rotationSpeed = 0.018; // Kecepatan nengok dipelankan (sebelumnya 0.035)
+                    let rotationSpeed = 0.02;
                     
                     camera.rotation.y += lookInput.x * rotationSpeed;
                     camera.rotation.x -= lookInput.y * rotationSpeed;
 
-                    // Batas Atas & Bawah (~75 derajat)
                     let maxAngle = Math.PI / 2.4;
                     camera.rotation.x = Math.max(-maxAngle, Math.min(maxAngle, camera.rotation.x));
                 }
 
-                // Kunci Tinggi Kamera
+                // Kunci Tinggi Kamera (Supaya tidak melayang/tenggelam)
                 camera.position.y = fixedFloorHeight;
             });
 
@@ -268,11 +259,9 @@
             }
         }
 
-        // Inisialisasi Joystick HTML
         setupHTMLJoystick("leftJoystickBase", "leftStick", moveInput);
         setupHTMLJoystick("rightJoystickBase", "rightStick", lookInput);
 
-        // Tombol Reset
         document.getElementById("resetBtn").addEventListener("click", function() {
             camera.position = initialCameraPosition.clone();
             camera.rotation = new BABYLON.Vector3(0, 0, 0);
