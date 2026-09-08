@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>3D Room Tour - Guaranteed Touch Controls</title>
+    <title>3D Room Tour - Smooth Controls & Collision</title>
     <style>
         html, body {
             overflow: hidden;
@@ -50,7 +50,7 @@
             z-index: 20;
         }
 
-        /* --- STYLING JOYSTICK HTML (SELALU MUNCUL DI ATAS CANVAS) --- */
+        /* STYLING JOYSTICK HTML OVERLAY */
         .joystick-base {
             position: absolute;
             bottom: 30px;
@@ -123,7 +123,7 @@
         const fixedFloorHeight = 1.6;
         const initialCameraPosition = new BABYLON.Vector3(0, fixedFloorHeight, 0);
 
-        // Nilai Input Joystick
+        // Data Input Joystick
         let moveInput = { x: 0, y: 0 };
         let lookInput = { x: 0, y: 0 };
 
@@ -131,13 +131,20 @@
             const scene = new BABYLON.Scene(engine);
             scene.clearColor = new BABYLON.Color3(0.1, 0.1, 0.15);
 
+            // 1. AKTIFKAN TABRAKAN PADA SCENE
+            scene.collisionsEnabled = true;
+
             // Universal Camera
             camera = new BABYLON.UniversalCamera("camera", initialCameraPosition.clone(), scene);
-            camera.speed = 0.15;
+            
+            // 2. AKTIFKAN FISIK & TABRAKAN KAMERA
+            camera.checkCollisions = true;
+            camera.applyGravity = false;
+            camera.ellipsoid = new BABYLON.Vector3(0.3, 0.8, 0.3); // Volume fisik kamera
 
-            // Tambahkan kontrol keyboard WASD untuk PC tanpa mematikan Touch Joystick
+            // Controls PC (Keyboard WASD)
             camera.attachControl(canvas, true);
-            camera.inputs.removeByType("FreeCameraTouchInput"); // Hapus touch bawaan agar tidak bentrok
+            camera.inputs.removeByType("FreeCameraTouchInput");
             camera.keysUp.push(87);    // W
             camera.keysDown.push(83);  // S
             camera.keysLeft.push(65);  // A
@@ -147,36 +154,44 @@
             const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
             light.intensity = 1.2;
 
-            // Load Model GLB
-            BABYLON.SceneLoader.Append("./", "1_LOW_RESIZED.glb", scene, function () {
+            // 3. LOAD MODEL GLB & AKTIFKAN TABRAKAN MESH
+            BABYLON.SceneLoader.Append("./", "1_LOW_RESIZED.glb", scene, function (loadedScene) {
                 console.log("Model berhasil dimuat!");
+                loadedScene.meshes.forEach(function (mesh) {
+                    mesh.checkCollisions = true; // Objek hasil scan jadi padat
+                });
             });
 
             // LOOP RENDER UTAMA
             scene.onBeforeRenderObservable.add(function () {
-                // 1. JOYSTICK KIRI: GERAK POSISI
+                // 1. JOYSTICK KIRI: GERAK POSISI (DIPELANKAN)
                 if (moveInput.x !== 0 || moveInput.y !== 0) {
+                    let moveSpeed = 0.05; // Kecepatan jalan dipelankan (sebelumnya 0.15)
+                    
                     let forward = camera.getDirection(BABYLON.Axis.Z);
                     let right = camera.getDirection(BABYLON.Axis.X);
                     forward.y = 0; right.y = 0;
                     forward.normalize(); right.normalize();
 
-                    let moveVector = forward.scale(moveInput.y * camera.speed).add(right.scale(moveInput.x * camera.speed));
-                    camera.position.addInPlace(moveVector);
+                    let moveVector = forward.scale(moveInput.y * moveSpeed).add(right.scale(moveInput.x * moveSpeed));
+                    
+                    // Gunakan moveWithCollisions agar ditahan jika menabrak dinding
+                    camera.moveWithCollisions(moveVector);
                 }
 
-                // 2. JOYSTICK KANAN: MURNI NENGOK
+                // 2. JOYSTICK KANAN: MURNI NENGOK (DIPELANKAN)
                 if (lookInput.x !== 0 || lookInput.y !== 0) {
-                    let rotationSpeed = 0.035;
-                    camera.rotation.y += lookInput.x * rotationSpeed;  // Kiri - Kanan
-                    camera.rotation.x -= lookInput.y * rotationSpeed;  // Tarik Atas = Nengok Atas
+                    let rotationSpeed = 0.018; // Kecepatan nengok dipelankan (sebelumnya 0.035)
+                    
+                    camera.rotation.y += lookInput.x * rotationSpeed;
+                    camera.rotation.x -= lookInput.y * rotationSpeed;
 
                     // Batas Atas & Bawah (~75 derajat)
                     let maxAngle = Math.PI / 2.4;
                     camera.rotation.x = Math.max(-maxAngle, Math.min(maxAngle, camera.rotation.x));
                 }
 
-                // Kunci Tinggi Kamera (Lantai Rata)
+                // Kunci Tinggi Kamera
                 camera.position.y = fixedFloorHeight;
             });
 
@@ -185,9 +200,7 @@
 
         const scene = createScene();
 
-        // ====================================================
-        // MANAJEMEN TOUCH EVENT BROWSER (MURNI & BUKAN VIA USER-AGENT)
-        // ====================================================
+        // MANAJEMEN TOUCH EVENT BROWSER
         function setupHTMLJoystick(baseId, stickId, outputObj) {
             const base = document.getElementById(baseId);
             const stick = document.getElementById(stickId);
