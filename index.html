@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>3D Room Tour - Fixed Mobile & PC Controls</title>
+    <title>3D Room Tour - Fixed Mobile & Laptop Controls</title>
     <style>
         html, body {
             overflow: hidden;
@@ -62,6 +62,7 @@
             touch-action: none;
             z-index: 999;
             box-sizing: border-box;
+            display: none; /* Standar disembunyikan, diaktifkan via JS jika Layar Sentuh */
         }
         #leftJoystickBase { left: 20px; }
         #rightJoystickBase { right: 20px; }
@@ -89,8 +90,8 @@
 
     <div id="instructions">
         <b>Kontrol:</b><br>
-        • 🟠 <b>Kiri / WASD:</b> Jalan<br>
-        • 🔵 <b>Kanan / Mouse:</b> Nengok
+        • <b>Laptop:</b> WASD / Panah (Jalan) & Drag Mouse (Nengok)<br>
+        • <b>HP:</b> Dual Joystick On-Screen
     </div>
 
     <button id="resetBtn">🔄 Reset</button>
@@ -109,34 +110,37 @@
         const engine = new BABYLON.Engine(canvas, true);
 
         let camera;
-        const fixedFloorHeight = 1.6;
+        const fixedFloorHeight = 1.8; // Dinaikkan sedikit dari lantai agar tidak terjebak collision
         const initialCameraPosition = new BABYLON.Vector3(0, fixedFloorHeight, 0);
 
         let moveInput = { x: 0, y: 0 };
         let lookInput = { x: 0, y: 0 };
 
+        // Deteksi apakah perangkat mendukung Touchscreen
+        const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+
         const createScene = function () {
             const scene = new BABYLON.Scene(engine);
             scene.clearColor = new BABYLON.Color3(0.1, 0.1, 0.15);
 
-            // AKTIFKAN COLLISION SCENE
             scene.collisionsEnabled = true;
 
             // Universal Camera
             camera = new BABYLON.UniversalCamera("camera", initialCameraPosition.clone(), scene);
-            camera.speed = 0.1;
+            camera.speed = 0.15;
+            camera.angularSensibility = 3000; // Sensitivitas rotasi mouse laptop
             
-            // ATUR UKURAN TABRAKAN KAMERA (Dibuat lebih kecil agar tidak mudah tersangkut di dalam mesh)
+            // Konfigurasi Tabrakan Kamera
             camera.checkCollisions = true;
             camera.applyGravity = false;
-            camera.ellipsoid = new BABYLON.Vector3(0.2, 0.7, 0.2);
+            camera.ellipsoid = new BABYLON.Vector3(0.2, 0.6, 0.2); // Volume tabrakan lebih ramping
 
-            // ATUR KONTROL KEYBOARD (WASD) UNTUK LAPTOP
+            // Hubungkan kontrol bawaan (Mouse & Keyboard WASD)
             camera.attachControl(canvas, true);
-            camera.keysUp = [87];    // W
-            camera.keysDown = [83];  // S
-            camera.keysLeft = [65];  // A
-            camera.keysRight = [68]; // D
+            camera.keysUp = [87, 38];    // W & Panah Atas
+            camera.keysDown = [83, 40];  // S & Panah Bawah
+            camera.keysLeft = [65, 37];  // A & Panah Kiri
+            camera.keysRight = [68, 39]; // D & Panah Kanan
 
             // Light Ambient
             const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
@@ -146,43 +150,40 @@
             BABYLON.SceneLoader.Append("./", "1_LOW_RESIZED.glb", scene, function (loadedScene) {
                 console.log("Model berhasil dimuat!");
                 
-                // Aktifkan collision hanya pada mesh yang memiliki geometri valid
                 loadedScene.meshes.forEach(function (mesh) {
+                    // Beri collision hanya jika mesh punya geometri valid
                     if (mesh.getTotalVertices() > 0) {
                         mesh.checkCollisions = true;
                     }
                 });
             });
 
-            // LOOP RENDER UTAMA
+            // RENDER LOOP
             scene.onBeforeRenderObservable.add(function () {
-                // 1. KONTROL JOYSTICK KIRI (JALAN)
-                if (moveInput.x !== 0 || moveInput.y !== 0) {
-                    let moveSpeed = 0.06;
-                    
-                    let forward = camera.getDirection(BABYLON.Axis.Z);
-                    let right = camera.getDirection(BABYLON.Axis.X);
-                    forward.y = 0; right.y = 0;
-                    forward.normalize(); right.normalize();
+                // HANYA JALANKAN INPUT JOYSTICK JIKA TOUCH DIPAKAI
+                if (isTouchDevice) {
+                    if (moveInput.x !== 0 || moveInput.y !== 0) {
+                        let moveSpeed = 0.06;
+                        let forward = camera.getDirection(BABYLON.Axis.Z);
+                        let right = camera.getDirection(BABYLON.Axis.X);
+                        forward.y = 0; right.y = 0;
+                        forward.normalize(); right.normalize();
 
-                    let moveVector = forward.scale(moveInput.y * moveSpeed).add(right.scale(moveInput.x * moveSpeed));
-                    
-                    // Eksekusi Pergerakan dengan Collision
-                    camera.moveWithCollisions(moveVector);
+                        let moveVector = forward.scale(moveInput.y * moveSpeed).add(right.scale(moveInput.x * moveSpeed));
+                        camera.moveWithCollisions(moveVector);
+                    }
+
+                    if (lookInput.x !== 0 || lookInput.y !== 0) {
+                        let rotationSpeed = 0.02;
+                        camera.rotation.y += lookInput.x * rotationSpeed;
+                        camera.rotation.x -= lookInput.y * rotationSpeed;
+
+                        let maxAngle = Math.PI / 2.4;
+                        camera.rotation.x = Math.max(-maxAngle, Math.min(maxAngle, camera.rotation.x));
+                    }
                 }
 
-                // 2. KONTROL JOYSTICK KANAN (NENGOK)
-                if (lookInput.x !== 0 || lookInput.y !== 0) {
-                    let rotationSpeed = 0.02;
-                    
-                    camera.rotation.y += lookInput.x * rotationSpeed;
-                    camera.rotation.x -= lookInput.y * rotationSpeed;
-
-                    let maxAngle = Math.PI / 2.4;
-                    camera.rotation.x = Math.max(-maxAngle, Math.min(maxAngle, camera.rotation.x));
-                }
-
-                // Kunci Tinggi Kamera (Supaya tidak melayang/tenggelam)
+                // Kunci Ketinggian Mata
                 camera.position.y = fixedFloorHeight;
             });
 
@@ -191,77 +192,83 @@
 
         const scene = createScene();
 
-        // MANAJEMEN TOUCH EVENT BROWSER
-        function setupHTMLJoystick(baseId, stickId, outputObj) {
-            const base = document.getElementById(baseId);
-            const stick = document.getElementById(stickId);
-            const maxRadius = 35;
-            let touchId = null;
+        // AKTIFKAN JOYSTICK HANYA DI PERANGKAT TOUCH (HP/TABLET)
+        if (isTouchDevice) {
+            document.getElementById("leftJoystickBase").style.display = "block";
+            document.getElementById("rightJoystickBase").style.display = "block";
 
-            base.addEventListener("touchstart", function (e) {
-                e.preventDefault();
-                if (touchId === null) {
-                    const touch = e.changedTouches[0];
-                    touchId = touch.identifier;
-                    updateStickPosition(touch);
-                }
-            }, { passive: false });
+            function setupHTMLJoystick(baseId, stickId, outputObj) {
+                const base = document.getElementById(baseId);
+                const stick = document.getElementById(stickId);
+                const maxRadius = 35;
+                let touchId = null;
 
-            window.addEventListener("touchmove", function (e) {
-                if (touchId !== null) {
-                    for (let i = 0; i < e.changedTouches.length; i++) {
-                        if (e.changedTouches[i].identifier === touchId) {
-                            updateStickPosition(e.changedTouches[i]);
-                            e.preventDefault();
-                            break;
+                base.addEventListener("touchstart", function (e) {
+                    e.preventDefault();
+                    if (touchId === null) {
+                        const touch = e.changedTouches[0];
+                        touchId = touch.identifier;
+                        updateStickPosition(touch);
+                    }
+                }, { passive: false });
+
+                window.addEventListener("touchmove", function (e) {
+                    if (touchId !== null) {
+                        for (let i = 0; i < e.changedTouches.length; i++) {
+                            if (e.changedTouches[i].identifier === touchId) {
+                                updateStickPosition(e.changedTouches[i]);
+                                e.preventDefault();
+                                break;
+                            }
                         }
                     }
+                }, { passive: false });
+
+                function resetStick() {
+                    touchId = null;
+                    stick.style.transform = `translate(0px, 0px)`;
+                    outputObj.x = 0;
+                    outputObj.y = 0;
                 }
-            }, { passive: false });
 
-            function resetStick() {
-                touchId = null;
-                stick.style.transform = `translate(0px, 0px)`;
-                outputObj.x = 0;
-                outputObj.y = 0;
-            }
-
-            window.addEventListener("touchend", function (e) {
-                if (touchId !== null) {
-                    for (let i = 0; i < e.changedTouches.length; i++) {
-                        if (e.changedTouches[i].identifier === touchId) {
-                            resetStick();
-                            break;
+                window.addEventListener("touchend", function (e) {
+                    if (touchId !== null) {
+                        for (let i = 0; i < e.changedTouches.length; i++) {
+                            if (e.changedTouches[i].identifier === touchId) {
+                                resetStick();
+                                break;
+                            }
                         }
                     }
+                });
+
+                window.addEventListener("touchcancel", resetStick);
+
+                function updateStickPosition(touch) {
+                    const rect = base.getBoundingClientRect();
+                    const centerX = rect.left + rect.width / 2;
+                    const centerY = rect.top + rect.height / 2;
+
+                    let deltaX = touch.clientX - centerX;
+                    let deltaY = touch.clientY - centerY;
+                    let dist = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+
+                    if (dist > maxRadius) {
+                        deltaX = (deltaX / dist) * maxRadius;
+                        deltaY = (deltaY / dist) * maxRadius;
+                    }
+
+                    stick.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
+                    outputObj.x = deltaX / maxRadius;
+                    outputObj.y = -(deltaY / maxRadius);
                 }
-            });
-
-            window.addEventListener("touchcancel", resetStick);
-
-            function updateStickPosition(touch) {
-                const rect = base.getBoundingClientRect();
-                const centerX = rect.left + rect.width / 2;
-                const centerY = rect.top + rect.height / 2;
-
-                let deltaX = touch.clientX - centerX;
-                let deltaY = touch.clientY - centerY;
-                let dist = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-
-                if (dist > maxRadius) {
-                    deltaX = (deltaX / dist) * maxRadius;
-                    deltaY = (deltaY / dist) * maxRadius;
-                }
-
-                stick.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
-                outputObj.x = deltaX / maxRadius;
-                outputObj.y = -(deltaY / maxRadius);
             }
+
+            setupHTMLJoystick("leftJoystickBase", "leftStick", moveInput);
+            setupHTMLJoystick("rightJoystickBase", "rightStick", lookInput);
         }
 
-        setupHTMLJoystick("leftJoystickBase", "leftStick", moveInput);
-        setupHTMLJoystick("rightJoystickBase", "rightStick", lookInput);
-
+        // RESET BUTTON
         document.getElementById("resetBtn").addEventListener("click", function() {
             camera.position = initialCameraPosition.clone();
             camera.rotation = new BABYLON.Vector3(0, 0, 0);
