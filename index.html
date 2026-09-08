@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>3D Room Tour - Fixed Mobile & Laptop Controls</title>
+    <title>3D Room Tour - Fixed Controls</title>
     <style>
         html, body {
             overflow: hidden;
@@ -62,7 +62,7 @@
             touch-action: none;
             z-index: 999;
             box-sizing: border-box;
-            display: none; /* Standar disembunyikan, diaktifkan via JS jika Layar Sentuh */
+            display: none;
         }
         #leftJoystickBase { left: 20px; }
         #rightJoystickBase { right: 20px; }
@@ -90,7 +90,7 @@
 
     <div id="instructions">
         <b>Kontrol:</b><br>
-        • <b>Laptop:</b> WASD / Panah (Jalan) & Drag Mouse (Nengok)<br>
+        • <b>Laptop:</b> Klik Layar lalu gunakan WASD / Panah & Drag Mouse<br>
         • <b>HP:</b> Dual Joystick On-Screen
     </div>
 
@@ -110,13 +110,12 @@
         const engine = new BABYLON.Engine(canvas, true);
 
         let camera;
-        const fixedFloorHeight = 1.8; // Dinaikkan sedikit dari lantai agar tidak terjebak collision
+        const fixedFloorHeight = 1.6;
         const initialCameraPosition = new BABYLON.Vector3(0, fixedFloorHeight, 0);
 
         let moveInput = { x: 0, y: 0 };
         let lookInput = { x: 0, y: 0 };
 
-        // Deteksi apakah perangkat mendukung Touchscreen
         const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
 
         const createScene = function () {
@@ -127,20 +126,25 @@
 
             // Universal Camera
             camera = new BABYLON.UniversalCamera("camera", initialCameraPosition.clone(), scene);
-            camera.speed = 0.15;
-            camera.angularSensibility = 3000; // Sensitivitas rotasi mouse laptop
+            camera.speed = 0.2;
+            camera.angularSensibility = 2000;
             
-            // Konfigurasi Tabrakan Kamera
+            // Atur Ukuran Tabrakan Tubuh Kamera
             camera.checkCollisions = true;
             camera.applyGravity = false;
-            camera.ellipsoid = new BABYLON.Vector3(0.2, 0.6, 0.2); // Volume tabrakan lebih ramping
+            camera.ellipsoid = new BABYLON.Vector3(0.15, 0.5, 0.15); // Ukuran dibuat sangat ramping agar bebas bergerak
 
-            // Hubungkan kontrol bawaan (Mouse & Keyboard WASD)
+            // KONTROL KEYBOARD LAPTOP
             camera.attachControl(canvas, true);
-            camera.keysUp = [87, 38];    // W & Panah Atas
-            camera.keysDown = [83, 40];  // S & Panah Bawah
-            camera.keysLeft = [65, 37];  // A & Panah Kiri
-            camera.keysRight = [68, 39]; // D & Panah Kanan
+            camera.keysUp = [87, 38];    // W / Panah Atas
+            camera.keysDown = [83, 40];  // S / Panah Bawah
+            camera.keysLeft = [65, 37];  // A / Panah Kiri
+            camera.keysRight = [68, 39]; // D / Panah Kanan
+
+            // Klik Canvas untuk memastikan fokus keyboard di Laptop
+            canvas.addEventListener("click", function() {
+                canvas.focus();
+            });
 
             // Light Ambient
             const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
@@ -151,39 +155,37 @@
                 console.log("Model berhasil dimuat!");
                 
                 loadedScene.meshes.forEach(function (mesh) {
-                    // Beri collision hanya jika mesh punya geometri valid
-                    if (mesh.getTotalVertices() > 0) {
+                    // Hanya aktifkan collision jika mesh memiliki polygon dan bukan pembungkus utama
+                    if (mesh.getTotalVertices() > 0 && mesh.name !== "__root__") {
                         mesh.checkCollisions = true;
                     }
                 });
             });
 
-            // RENDER LOOP
+            // RENDER LOOP UTAMA
             scene.onBeforeRenderObservable.add(function () {
-                // HANYA JALANKAN INPUT JOYSTICK JIKA TOUCH DIPAKAI
-                if (isTouchDevice) {
-                    if (moveInput.x !== 0 || moveInput.y !== 0) {
-                        let moveSpeed = 0.06;
-                        let forward = camera.getDirection(BABYLON.Axis.Z);
-                        let right = camera.getDirection(BABYLON.Axis.X);
-                        forward.y = 0; right.y = 0;
-                        forward.normalize(); right.normalize();
+                // LOGIKA MOUNT JOYSTICK HP
+                if (isTouchDevice && (moveInput.x !== 0 || moveInput.y !== 0)) {
+                    let moveSpeed = 0.06;
+                    let forward = camera.getDirection(BABYLON.Axis.Z);
+                    let right = camera.getDirection(BABYLON.Axis.X);
+                    forward.y = 0; right.y = 0;
+                    forward.normalize(); right.normalize();
 
-                        let moveVector = forward.scale(moveInput.y * moveSpeed).add(right.scale(moveInput.x * moveSpeed));
-                        camera.moveWithCollisions(moveVector);
-                    }
-
-                    if (lookInput.x !== 0 || lookInput.y !== 0) {
-                        let rotationSpeed = 0.02;
-                        camera.rotation.y += lookInput.x * rotationSpeed;
-                        camera.rotation.x -= lookInput.y * rotationSpeed;
-
-                        let maxAngle = Math.PI / 2.4;
-                        camera.rotation.x = Math.max(-maxAngle, Math.min(maxAngle, camera.rotation.x));
-                    }
+                    let moveVector = forward.scale(moveInput.y * moveSpeed).add(right.scale(moveInput.x * moveSpeed));
+                    camera.moveWithCollisions(moveVector);
                 }
 
-                // Kunci Ketinggian Mata
+                if (isTouchDevice && (lookInput.x !== 0 || lookInput.y !== 0)) {
+                    let rotationSpeed = 0.02;
+                    camera.rotation.y += lookInput.x * rotationSpeed;
+                    camera.rotation.x -= lookInput.y * rotationSpeed;
+
+                    let maxAngle = Math.PI / 2.4;
+                    camera.rotation.x = Math.max(-maxAngle, Math.min(maxAngle, camera.rotation.x));
+                }
+
+                // Kunci Tinggi Kamera
                 camera.position.y = fixedFloorHeight;
             });
 
@@ -192,7 +194,7 @@
 
         const scene = createScene();
 
-        // AKTIFKAN JOYSTICK HANYA DI PERANGKAT TOUCH (HP/TABLET)
+        // AKTIFKAN JOYSTICK DI LAYAR SENTUH (HP/TABLET)
         if (isTouchDevice) {
             document.getElementById("leftJoystickBase").style.display = "block";
             document.getElementById("rightJoystickBase").style.display = "block";
@@ -268,7 +270,7 @@
             setupHTMLJoystick("rightJoystickBase", "rightStick", lookInput);
         }
 
-        // RESET BUTTON
+        // TOMBOL RESET
         document.getElementById("resetBtn").addEventListener("click", function() {
             camera.position = initialCameraPosition.clone();
             camera.rotation = new BABYLON.Vector3(0, 0, 0);
