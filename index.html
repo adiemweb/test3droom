@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>3D Room Tour - Fixed Blender Collision</title>
+    <title>3D Room Tour - Final Fixed Controls & Reset</title>
     <style>
         html, body {
             overflow: hidden;
@@ -110,7 +110,6 @@
         const engine = new BABYLON.Engine(canvas, true);
 
         let camera;
-        // Posisi spawn awal kamera
         const initialCameraPosition = new BABYLON.Vector3(0, 1.7, 0);
 
         let moveInput = { x: 0, y: 0 };
@@ -133,8 +132,7 @@
             // Konfigurasi Fisik Kamera
             camera.checkCollisions = true;
             camera.applyGravity = false;
-            // Radius fisik kamera: Tebal 1m (0.5m x 2), Tinggi 1.8m (0.9m x 2)
-            camera.ellipsoid = new BABYLON.Vector3(0.5, 0.9, 0.5);
+            camera.ellipsoid = new BABYLON.Vector3(0.4, 0.85, 0.4);
 
             // Controls Keyboard Laptop
             camera.attachControl(canvas, true);
@@ -143,7 +141,6 @@
             camera.keysLeft = [65, 37];  // A, Panah Kiri
             camera.keysRight = [68, 39]; // D, Panah Kanan
 
-            // Focus canvas saat diklik
             canvas.addEventListener("click", function() {
                 canvas.focus();
             });
@@ -152,43 +149,39 @@
             const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
             light.intensity = 1.2;
 
-            // 3. LOAD MODEL GLB & DETEKSI MESH Murni
+            // 3. LOAD MODEL GLB & DETEKSI MESH COL
             BABYLON.SceneLoader.Append("./", "1_LOW_RESIZED.glb", scene, function (loadedScene) {
                 console.log("Model GLB Berhasil Dimuat!");
 
                 loadedScene.meshes.forEach(function (mesh) {
-                    // Hanya proses mesh yang memiliki geometry/polygon (bukan node kosong/transform)
                     if (mesh.getTotalVertices && mesh.getTotalVertices() > 0) {
-                        
                         if (mesh.name.toUpperCase().includes("COL")) {
                             mesh.checkCollisions = true;
-                            
-                            // MODES DEBUG: Set ke 0.5 agar terlihat fisik kotaknya di layar.
-                            // Ubah ke 0 jika sudah tidak menembus & siap dipublikasikan!
-                            mesh.visibility = 0.5; 
-                            
-                            console.log("Collision Aktif pada: " + mesh.name);
+                            mesh.visibility = 0; // Transparan 100% (Ubah ke 0.5 jika ingin tes fisik kotaknya)
                         } else {
-                            mesh.checkCollisions = false; // Mesh scan visual tidak dihitung tabrakan
+                            mesh.checkCollisions = false;
                         }
                     }
                 });
             });
 
-            // 4. LOGIKA PERGERAKAN TOUCH JOYSTICK HP
+            // 4. LOGIKA PERGERAKAN TOUCH JOYSTICK HP (SAMA DENGAN LAPTOP)
             scene.onBeforeRenderObservable.add(function () {
                 if (isTouchDevice) {
                     if (moveInput.x !== 0 || moveInput.y !== 0) {
-                        let moveSpeed = 0.05;
+                        let moveSpeed = 0.08;
                         let forward = camera.getDirection(BABYLON.Axis.Z);
                         let right = camera.getDirection(BABYLON.Axis.X);
-                        forward.y = 0; right.y = 0;
-                        forward.normalize(); right.normalize();
+                        
+                        forward.y = 0; 
+                        right.y = 0;
+                        forward.normalize(); 
+                        right.normalize();
 
                         let moveVector = forward.scale(moveInput.y * moveSpeed).add(right.scale(moveInput.x * moveSpeed));
                         
-                        // Pergerakan HP wajib pakai moveWithCollisions
-                        camera.moveWithCollisions(moveVector);
+                        // Menyalurkan pergerakan ke sistem bawaan kamera agar collision aktif & tidak stuck
+                        camera.cameraDirection.addInPlace(moveVector);
                     }
 
                     if (lookInput.x !== 0 || lookInput.y !== 0) {
@@ -283,10 +276,21 @@
             setupHTMLJoystick("rightJoystickBase", "rightStick", lookInput);
         }
 
-        // RESET BUTTON
+        // RESET BUTTON (DI-REWRITE TOTAL AGAR BISA MEMBIFORKASI TOTAL INERTIA/MOMENTUM)
         document.getElementById("resetBtn").addEventListener("click", function() {
+            // 1. Hentikan sisa momentum pergerakan & rotasi bawaan engine
+            camera.cameraDirection.set(0, 0, 0);
+            camera.cameraRotation.set(0, 0);
+
+            // 2. Kembalikan koordinat posisi & arah pandang ke awal
             camera.position.copyFrom(initialCameraPosition);
             camera.rotation.set(0, 0, 0);
+
+            // 3. Bersihkan nilai input pergerakan joystick HP
+            moveInput.x = 0;
+            moveInput.y = 0;
+            lookInput.x = 0;
+            lookInput.y = 0;
         });
 
         engine.runRenderLoop(function () {
