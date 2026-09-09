@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>3D Room Tour - Guaranteed Working Controls</title>
+    <title>3D Room Tour - Custom Blender Collisions</title>
     <style>
         html, body {
             overflow: hidden;
@@ -110,7 +110,8 @@
         const engine = new BABYLON.Engine(canvas, true);
 
         let camera;
-        const initialCameraPosition = new BABYLON.Vector3(0, 1.8, 0);
+        // Posisi spawn awal kamera (atur Y sedikit di atas lantai COL_)
+        const initialCameraPosition = new BABYLON.Vector3(0, 1.7, 0);
 
         let moveInput = { x: 0, y: 0 };
         let lookInput = { x: 0, y: 0 };
@@ -121,15 +122,21 @@
             const scene = new BABYLON.Scene(engine);
             scene.clearColor = new BABYLON.Color3(0.1, 0.1, 0.15);
 
-            // Universal Camera
+            // 1. AKTIFKAN FUNGSI TABRAKAN DI SCENE
+            scene.collisionsEnabled = true;
+
+            // 2. SETUP KAMERA
             camera = new BABYLON.UniversalCamera("camera", initialCameraPosition.clone(), scene);
             camera.speed = 0.15;
             camera.angularSensibility = 2000;
             
-            // KONTROL DUAL LAPTOP & HP
+            // Aktifkan Collision & Gravitasi Kamera
+            camera.checkCollisions = true;
+            camera.applyGravity = false; // Set true jika ingin kamera menempel di lantai COL via gravitasi
+            camera.ellipsoid = new BABYLON.Vector3(0.3, 0.85, 0.3); // Radius fisik tubuh kamera (Lebar 0.6m, Tinggi 1.7m)
+
+            // Kontrol Laptop (WASD & Panah)
             camera.attachControl(canvas, true);
-            
-            // Definisikan tombol WASD dan Panah secara bersih
             camera.keysUp = [87, 38];    // W, Panah Atas
             camera.keysDown = [83, 40];  // S, Panah Bawah
             camera.keysLeft = [65, 37];  // A, Panah Kiri
@@ -139,12 +146,23 @@
             const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
             light.intensity = 1.2;
 
-            // LOAD MODEL GLB
+            // 3. LOAD MODEL GLB & SETUP MESH COL_1 - COL_4
             BABYLON.SceneLoader.Append("./", "1_LOW_RESIZED.glb", scene, function (loadedScene) {
-                console.log("Model 3D Berhasil Dimuat!");
+                console.log("Model 3D & Mesh Collision Berhasil Dimuat!");
+
+                loadedScene.meshes.forEach(function (mesh) {
+                    // Deteksi nama mesh COL_1, COL_2, COL_3, COL_4, dll.
+                    if (mesh.name.toUpperCase().includes("COL")) {
+                        mesh.checkCollisions = true; // Aktifkan dinding/lantai pembatas
+                        mesh.visibility = 0;         // Sembunyikan visualnya agar transparan
+                        console.log("Registered Collision Mesh: " + mesh.name);
+                    } else {
+                        mesh.checkCollisions = false; // Mesh scan visual dibebaskan agar tidak bikin macet
+                    }
+                });
             });
 
-            // LOOP RENDER UTAMA (Khusus Pengolahan Touchscreen HP)
+            // 4. RENDER LOOP (Untuk Joystick Touch HP)
             scene.onBeforeRenderObservable.add(function () {
                 if (isTouchDevice) {
                     if (moveInput.x !== 0 || moveInput.y !== 0) {
@@ -155,7 +173,9 @@
                         forward.normalize(); right.normalize();
 
                         let moveVector = forward.scale(moveInput.y * moveSpeed).add(right.scale(moveInput.x * moveSpeed));
-                        camera.position.addInPlace(moveVector);
+                        
+                        // Pergerakan HP menggunakan metode Collision
+                        camera.moveWithCollisions(moveVector);
                     }
 
                     if (lookInput.x !== 0 || lookInput.y !== 0) {
@@ -174,7 +194,7 @@
 
         const scene = createScene();
 
-        // AKTIFKAN JOYSTICK JIKA DI HP
+        // JOYSTICK SETUP FOR HP
         if (isTouchDevice) {
             document.getElementById("leftJoystickBase").style.display = "block";
             document.getElementById("rightJoystickBase").style.display = "block";
